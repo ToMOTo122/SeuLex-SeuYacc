@@ -30,6 +30,7 @@ T_INFO* types_fun(T_INFO* ret, T_LIST* params) {
     T_INFO* t = (T_INFO*)malloc(sizeof(T_INFO));
     t->kind = func_t;
     t->info.fun.target = ret;
+    t->info.fun.params = params;
     t->name = NULL;
     return t;
 }

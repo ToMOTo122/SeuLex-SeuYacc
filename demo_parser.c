@@ -1,10 +1,11 @@
-/* MiniC compiler driver */
+/* Demo: Parser driver with production trace */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include "symtab.h"
 
-extern int yylex(void);
+extern SYM_TAB* scope;
 extern int yyparse(void);
-extern char* yytext;
 extern int yylineno;
 extern int lineno;
 extern FILE* yyin;      /* defined in yylex.c */
@@ -12,12 +13,13 @@ extern FILE* yyin;      /* defined in yylex.c */
 extern void names_init(void);
 
 int main(int argc, char* argv[]) {
-    if (argc != 2) {
-        fprintf(stderr, "Usage: minic <source.minic>\n");
+    if (argc < 2) {
+        fprintf(stderr, "Usage: demo_parser <source.minic>\n");
         return 1;
     }
 
     names_init();
+    scope = symtab_open(NULL);  /* initialize global scope */
 
     yyin = fopen(argv[1], "r");
     if (!yyin) {
@@ -25,17 +27,17 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    printf("=== MiniC Compiler ===\n");
-    printf("Source: %s\n\n", argv[1]);
+    printf("=== SeuYacc Demo: Parse Trace ===\n");
+    printf("Input: %s\n\n", argv[1]);
 
     int result = yyparse();
 
     fclose(yyin);
 
     if (result == 0)
-        printf("\n=== Compilation Successful ===\n");
+        printf("\n=== Parse Successful ===\n");
     else
-        printf("\n=== Compilation Failed ===\n");
+        printf("\n=== Parse Failed ===\n");
 
     return result;
 }
