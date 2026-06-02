@@ -18,7 +18,7 @@ struct T_INFO {
     TypeKind kind;
     union {
         struct { T_INFO* target; } array;    /* array of target type */
-        struct { T_INFO* target; } fun;      /* function returning target */
+        struct { T_INFO* target; T_LIST* params; } fun; /* function: return type + param types */
         SYM_LIST* fields;                     /* record fields */
     } info;
     char* name;  /* for debugging */

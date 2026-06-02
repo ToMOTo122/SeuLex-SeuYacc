@@ -73,6 +73,7 @@ python build.py seuyacc    REM 编译 SeuYacc.exe
 
 ```cmd
 SeuLex.exe 课程资料/minic.l -o yylex.c
+
 SeuYacc.exe 课程资料/minic.y -o yyparse.c
 ```
 
@@ -80,12 +81,21 @@ SeuYacc.exe 课程资料/minic.y -o yyparse.c
 
 ```cmd
 python build_minic.py
+python build_demo.py
+
 ```
 
 ### 第五步：测试
 
 ```cmd
 minic.exe test.minic
+./demo_lexer.exe test.minic
+
+python build.py seuyacc
+SeuYacc.exe 课程资料/minic.y -o yyparse.c
+python build_minic.py
+python build_demo.py
+.\demo_parser.exe test.minic
 ```
 
 输出 `=== Compilation Successful ===` 表示词法分析、语法分析、语义检查全部通过。
@@ -154,9 +164,24 @@ minic.exe <source.minic>
 
 测试程序 `test.minic` 覆盖了变量声明、函数定义、赋值、函数调用、if-else、return 等特性。
 
+## 验收演示
+
+详细的验收演示步骤见 [demo_commands.md](demo_commands.md)。
+
+**SeuLex 演示流程**：minic.l → SeuLex → yylex.c → 编译 demo_lexer.exe → 输入 MiniC 程序 → 输出 token 流
+
+**SeuYacc 演示流程**：minic.y → SeuYacc → yyparse.c → 编译 demo_parser.exe (TRACE 模式) → 输入 token 流 → 输出归约序列和语法树
+
+**演示文件**：
+| 文件 | 用途 |
+|------|------|
+| `demo_lexer.c` | Token 流打印驱动程序 |
+| `demo_test.minic` | MiniC 测试程序（递归阶乘） |
+| `demo_commands.md` | 完整验收演示步骤和预期输出 |
+
 ## 清理
 
 ```cmd
 del /s *.obj
-del minic.exe
+del minic.exe demo_lexer.exe demo_parser.exe
 ```
