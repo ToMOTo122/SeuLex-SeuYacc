@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MiniC 编译过程可视化</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+@keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.fade-in{animation:fadeIn .2s}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+.animate-pulse{animation:pulse 1s infinite}
+</style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+<div class="max-w-5xl mx-auto p-4 md:p-6">
+  <!-- Header -->
+  <nav class="flex justify-between items-center mb-6">
+    <div class="flex items-center bg-white/80 rounded-xl p-3 shadow border border-slate-200">
+      <div class="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center mr-3 shadow">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+      </div>
+      <div>
+        <h1 class="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">MiniC 编译可视化</h1>
+        <p class="text-xs text-slate-500">SeuLex + SeuYacc</p>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Code Input -->
+  <div class="bg-white rounded-2xl p-5 shadow-lg border border-slate-200 mb-5">
+    <div class="flex justify-between items-center mb-3">
+      <div class="flex items-center">
+        <div class="bg-gradient-to-r from-blue-500 to-purple-600 p-2 rounded-lg mr-2">
+          <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+        </div>
+        <h2 class="text-lg font-semibold text-slate-800">输入代码</h2>
+      </div>
+      <button id="btnCompile" onclick="compile()" class="flex items-center bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium py-2 px-5 rounded-xl shadow transition-all hover:scale-[1.02] active:scale-[0.98]">
+        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        分析代码
+      </button>
+    </div>
+    <textarea id="srcCode" class="w-full h-32 p-3 font-mono text-sm border-2 border-slate-300 rounded-xl focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none resize-none" placeholder="输入 MiniC 代码...">int main() {
+    int x;
+    x = 10 + 5;
+    if (x == 15)
+        return 1;
+    else
+        return 0;
+}</textarea>
+    <div class="flex items-center justify-between mt-3">
+      <div class="flex gap-2">
+        <button onclick="loadEx(0)" class="text-xs px-3 py-1 bg-slate-100 hover:bg-blue-50 border border-slate-200 rounded-lg transition">示例1: 函数</button>
+        <button onclick="loadEx(1)" class="text-xs px-3 py-1 bg-slate-100 hover:bg-blue-50 border border-slate-200 rounded-lg transition">示例2: if嵌套</button>
+        <button onclick="loadEx(2)" class="text-xs px-3 py-1 bg-slate-100 hover:bg-blue-50 border border-slate-200 rounded-lg transition">示例3: 递归</button>
+      </div>
+      <div class="flex items-center gap-3">
+        <button id="btnStep" onclick="doStep()" class="text-xs px-3 py-1.5 bg-slate-200 hover:bg-slate-300 rounded-lg transition disabled:opacity-40" disabled>单步</button>
+        <button id="btnAuto" onclick="toggleAuto()" class="text-xs px-3 py-1.5 bg-slate-200 hover:bg-slate-300 rounded-lg transition disabled:opacity-40" disabled>▶ 自动</button>
+        <button onclick="reset()" class="text-xs px-3 py-1.5 bg-slate-200 hover:bg-slate-300 rounded-lg transition">↺ 重置</button>
+        <input id="speed" type="range" min="1" max="10" value="5" class="w-20 accent-blue-500">
+      </div>
+    </div>
+    <div id="statusBar" class="mt-3 text-xs text-slate-500 text-right">就绪</div>
+  </div>
+
+  <!-- Phase 1: Lexical -->
+  <div id="phaseLex" class="bg-white rounded-2xl p-5 shadow border border-slate-100 mb-4">
+    <h2 class="text-lg font-semibold mb-3 flex items-center">
+      <span class="w-7 h-7 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center mr-2 text-sm font-bold">1</span>
+      词法分析
+      <svg class="w-4 h-4 ml-auto text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+    </h2>
+    <div id="scanArea" class="font-mono text-sm p-2 bg-slate-50 rounded-lg mb-2 min-h-[60px] whitespace-pre-wrap border border-slate-200"></div>
+    <div id="dfaPath" class="font-mono text-xs text-slate-500 mb-2"></div>
+    <div id="tokenFlow" class="flex flex-wrap gap-1 min-h-[24px]"></div>
+  </div>
+
+  <!-- Phase 2: Parsing -->
+  <div id="phaseParse" class="bg-white rounded-2xl p-5 shadow border border-slate-100 mb-4">
+    <h2 class="text-lg font-semibold mb-3 flex items-center">
+      <span class="w-7 h-7 rounded-full bg-blue-100 text-blue-800 flex items-center justify-center mr-2 text-sm font-bold">2</span>
+      语法分析
+      <svg class="w-4 h-4 ml-auto text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2 1 3 3 3h14c2 0 3-1 3-3V7c0-2-1-3-3-3H7c-2 0-3 1-3 3z"/></svg>
+    </h2>
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <div class="text-xs text-slate-500 mb-1">Stack</div>
+        <div id="stackArea" class="font-mono text-xs p-2 bg-slate-50 rounded-lg border border-slate-200 min-h-[80px]"></div>
+      </div>
+      <div>
+        <div class="text-xs text-slate-500 mb-1">Input</div>
+        <div id="inputArea" class="font-mono text-xs p-2 bg-slate-50 rounded-lg border border-slate-200 min-h-[80px]"></div>
+      </div>
+    </div>
+    <div id="actionBox" class="mt-3 font-mono text-xs p-2 rounded-lg min-h-[28px]"></div>
+  </div>
+
+  <!-- Phase 3: AST -->
+  <div id="phaseAST" class="bg-white rounded-2xl p-5 shadow border border-slate-100 mb-4">
+    <h2 class="text-lg font-semibold mb-3 flex items-center">
+      <span class="w-7 h-7 rounded-full bg-purple-100 text-purple-800 flex items-center justify-center mr-2 text-sm font-bold">3</span>
+      语法树
+      <svg class="w-4 h-4 ml-auto text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+    </h2>
+    <div id="astControls" class="flex gap-2 mb-2">
+      <button onclick="zoomIn()" class="text-xs px-2 py-1 bg-slate-100 rounded">+ 缩放</button>
+      <button onclick="zoomOut()" class="text-xs px-2 py-1 bg-slate-100 rounded">- 缩放</button>
+    </div>
+    <div id="astArea" class="bg-slate-50 rounded-lg border border-slate-200 min-h-[120px] overflow-auto">
+      <span class="text-xs text-slate-400 p-3">编译完成后显示</span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ========== MiniC Lexer (based on minic.l) ==========
+const KW = {int:'INT',if:'IF',else:'ELSE',return:'RETURN',float:'FLOAT',struct:'STRUCT',void:'VOID',while:'WHILE',for:'FOR'};
+const SP = {'(':'LPAR',')':'RPAR','{':'LBRACE','}':'RBRACE','[':'LBRACK',']':'RBRACK',';':'SEMICOLON',',':'COMMA','.':'DOT','+':'PLUS','-':'MINUS','*':'TIMES','/':'DIVIDE','%':'MOD'};
+function lexer(src) {
+  const T = []; let i = 0, line = 1;
+  while (i < src.length) {
+    const c = src[i];
+    if (c === ' ' || c === '\t' || c === '\r') { i++; continue; }
+    if (c === '\n') { i++; line++; continue; }
+    if (c === '=' && src[i+1] === '=') { T.push({t:'EQUAL',v:'==',p:i,line}); i += 2; continue; }
+    if (c === '!' && src[i+1] === '=') { T.push({t:'NE',v:'!=',p:i,line}); i += 2; continue; }
+    if (c === '<' && src[i+1] === '=') { T.push({t:'LE',v:'<=',p:i,line}); i += 2; continue; }
+    if (c === '>' && src[i+1] === '=') { T.push({t:'GE',v:'>=',p:i,line}); i += 2; continue; }
+    if (c === '<') { T.push({t:'LT',v:'<',p:i,line}); i++; continue; }
+    if (c === '>') { T.push({t:'GT',v:'>',p:i,line}); i++; continue; }
+    if (c === '=') { T.push({t:'ASSIGN',v:'=',p:i,line}); i++; continue; }
+    if (/[a-zA-Z_]/.test(c)) {
+      let w = '', j = i;
+      while (j < src.length && /[a-zA-Z0-9_]/.test(src[j])) { w += src[j]; j++; }
+      T.push({t:KW[w] || 'NAME',v:w,p:i,line}); i = j; continue;
+    }
+    if (/[0-9]/.test(c)) {
+      let n = '', j = i;
+      while (j < src.length && /[0-9.]/.test(src[j])) { n += src[j]; j++; }
+      T.push({t:'NUMBER',v:n,p:i,line}); i = j; continue;
+    }
+    if (SP[c]) { T.push({t:SP[c],v:c,p:i,line}); i++; continue; }
+    T.push({t:'ERROR',v:c,p:i,line}); i++;
+  }
+  T.push({t:'$',v:'$',p:i,line});
+  return T;
+}
+
+function tDisp(t) { return t.t === '$' ? '$' : t.v; }
+function tColor(t) {
+  const m = {INT:'bg-red-100 text-red-800',IF:'bg-red-100 text-red-800',ELSE:'bg-red-100 text-red-800',RETURN:'bg-red-100 text-red-800',FLOAT:'bg-red-100 text-red-800',STRUCT:'bg-red-100 text-red-800',VOID:'bg-red-100 text-red-800',WHILE:'bg-red-100 text-red-800',FOR:'bg-red-100 text-red-800',NAME:'bg-purple-100 text-purple-800',NUMBER:'bg-green-100 text-green-800',PLUS:'bg-blue-100 text-blue-800',MINUS:'bg-blue-100 text-blue-800',TIMES:'bg-blue-100 text-blue-800',DIVIDE:'bg-blue-100 text-blue-800',ASSIGN:'bg-blue-100 text-blue-800',EQUAL:'bg-blue-100 text-blue-800',LPAR:'bg-amber-100 text-amber-800',RPAR:'bg-amber-100 text-amber-800',LBRACE:'bg-amber-100 text-amber-800',RBRACE:'bg-amber-100 text-amber-800',SEMICOLON:'bg-amber-100 text-amber-800'};
+  return m[t.t] || 'bg-slate-100 text-slate-700';
+}
+
+// ========== MiniC Parser (recursive descent) ==========
+function parse(T) {
+  const E = []; let ti = 0;
+  const stack = [];
+  function pk() { return T[ti] || {t:'$',v:'$'}; }
+  function sh() { const t = pk(); ti++; stack.push(tDisp(t)); E.push({a:'sh',t,ti:ti-1}); return t; }
+  function rd(txt, n) { for (let j=0;j<n&&stack.length;j++) stack.pop(); const lhs = txt.split('→')[0].trim(); stack.push(lhs); E.push({a:'rd',txt}); }
+  function err(m) { E.push({a:'err',txt:m}); }
+
+  function isFun() {
+    for (let j=ti;j<T.length-2;j++) {
+      if (['INT','FLOAT','STRUCT'].indexOf(T[j].t)>=0 && T[j+1]&&T[j+1].t==='NAME' && T[j+2]&&T[j+2].t==='LPAR') return true;
+      break;
+    } return false;
+  }
+
+  // Grammar functions - each returns number of RHS symbols for reduction
+  function pType() {
+    const t = pk();
+    if (t.t === 'INT') { sh(); rd('type → INT', 1); return 1; }
+    if (t.t === 'FLOAT') { sh(); rd('type → FLOAT', 1); return 1; }
+    if (t.t === 'STRUCT') { sh(); if (pk().t !== 'LBRACE') { err('期望 {'); return 0; } sh(); pFields(); if (pk().t !== 'RBRACE') { err('期望 }'); return 0; } sh(); rd('type → struct { fields }', 4); return 4; }
+    err('期望类型'); return 0;
+  }
+  function pFields() { if (['INT','FLOAT','STRUCT'].indexOf(pk().t)>=0) { pField(); pFields(); rd('fields → field fields', 2); } else rd('fields → ε', 0); }
+  function pField() { pType(); if (pk().t !== 'NAME') { err('期望 NAME'); return; } sh(); if (pk().t !== 'SEMICOLON') { err('期望 ;'); return; } sh(); rd('field → type NAME ;', 3); }
+  function pVarDecl() { pType(); if (pk().t !== 'NAME') { err('期望 NAME'); return; } sh(); if (pk().t !== 'SEMICOLON') { err('期望 ;'); return; } sh(); rd('var_decl → type NAME ;', 3); }
+  function pVarDecls() { let n=0; while (['INT','FLOAT','STRUCT'].indexOf(pk().t)>=0 && !isFun()) { pVarDecl(); n++; } if (n) rd('var_decls → var_decl ...', n); else rd('var_decls → ε', 0); }
+  function pFunDecl() { pFunHeader(); if (pk().t !== 'LPAR') { err('期望 ('); return; } sh(); pParams(); if (pk().t !== 'RPAR') { err('期望 )'); return; } sh(); pBlock(); rd('fun_decl → fun_header ( params ) block', 5); }
+  function pFunHeader() { pType(); if (pk().t !== 'NAME') { err('期望 NAME'); return; } sh(); rd('fun_header → type NAME', 2); }
+  function pParams() { if (['INT','FLOAT','STRUCT'].indexOf(pk().t)>=0 && T[ti+1] && T[ti+1].t === 'NAME') { pParam(); pMoreParams(); rd('params → more_params', 2); } else rd('params → ε', 0); }
+  function pMoreParams() { pParam(); if (pk().t === 'COMMA') { sh(); pMoreParams(); rd('more_params → param , more_params', 3); } else rd('more_params → param', 1); }
+  function pParam() { pType(); if (pk().t !== 'NAME') { err('期望 NAME'); return; } sh(); rd('param → type NAME', 2); }
+  function pBlock() { if (pk().t !== 'LBRACE') { err('期望 {'); return; } sh(); rd('block → { ...', 1); pVarDecls(); pStmts(); if (pk().t !== 'RBRACE') { err('期望 }'); return; } sh(); rd('block → ... }', 1); }
+  function pStmts() { let n=0; while (pk().t !== 'RBRACE' && pk().t !== '$') { pStmt(); n++; } if (n) rd('stmts → stmt ...', n); else rd('stmts → ε', 0); }
+  function pStmt() {
+    if (pk().t === 'RETURN') { sh(); pExp(); if (pk().t !== 'SEMICOLON') { err('期望 ;'); return; } sh(); rd('stmt → return exp ;', 3); return; }
+    if (pk().t === 'IF') {
+      sh(); if (pk().t !== 'LPAR') { err('期望 ('); return; } sh(); pExp(); if (pk().t !== 'RPAR') { err('期望 )'); return; } sh(); pStmt();
+      if (pk().t === 'ELSE') { sh(); pStmt(); rd('stmt → if ( exp ) stmt else stmt', 6); return; }
+      rd('stmt → if ( exp ) stmt', 4); return;
+    }
+    if (pk().t === 'LBRACE') { pBlock(); rd('stmt → block', 1); return; }
+    pLexp(); if (pk().t !== 'ASSIGN') { err('期望 ='); return; } sh(); pExp(); if (pk().t !== 'SEMICOLON') { err('期望 ;'); return; } sh(); rd('stmt → lexp = exp ;', 4);
+  }
+  function pLexp() { pVar(); while (pk().t === 'LBRACK') { sh(); pExp(); if (pk().t !== 'RBRACK') { err('期望 ]'); return; } sh(); rd('lexp → lexp [ exp ]', 3); } if (pk().t === 'DOT') { sh(); if (pk().t !== 'NAME') { err('期望 NAME'); return; } sh(); rd('lexp → lexp . NAME', 3); } rd('lexp → var', 1); }
+  const PR = {TIMES:5,DIVIDE:5,PLUS:4,MINUS:4,EQUAL:2};
+  function pExpPrec(m) { pAtom(); while (true) { const p = PR[pk().t]; if (!p || p < m) break; const op = sh(); pExpPrec(p+1); rd('exp → exp ' + op.v + ' exp', 3); } }
+  function pAtom() {
+    if (pk().t === 'MINUS') { sh(); pAtom(); rd('exp → - exp', 2); return; }
+    if (pk().t === 'LPAR') { sh(); pExp(); if (pk().t !== 'RPAR') { err('期望 )'); return; } sh(); rd('exp → ( exp )', 3); return; }
+    if (pk().t === 'NUMBER') { sh(); rd('exp → NUMBER', 1); return; }
+    if (pk().t === 'NAME') {
+      if (T[ti+1] && T[ti+1].t === 'LPAR') { sh(); sh(); if (pk().t === 'RPAR') { sh(); rd('exp → NAME ( )', 3); return; } pExps(); if (pk().t !== 'RPAR') { err('期望 )'); return; } sh(); rd('exp → NAME ( exps )', 4); return; }
+      pVar(); return;
+    }
+    err('意外 token ' + pk().t); sh();
+  }
+  function pExps() { pExp(); if (pk().t === 'COMMA') { sh(); pExps(); rd('exps → exp , exps', 3); } else rd('exps → exp', 1); }
+  function pVar() { if (pk().t !== 'NAME') { err('期望 NAME'); return; } sh(); rd('var → NAME', 1); }
+  function pExp() { pExpPrec(0); }
+  function pDecl() { if (isFun()) pFunDecl(); else pVarDecl(); }
+  function pDecls() { let n=0; while (pk().t !== '$' && pk().t !== 'RBRACE') { pDecl(); n++; } if (n) rd('declarations → decl ...', n); else rd('declarations → ε', 0); }
+
+  pDecls(); rd('program → declarations', 1);
+  E.push({a:'ac',txt:'✓ 解析完成'});
+  return {events:E, stack};
+}
+
+// ========== State ==========
+let S = {src:'',T:[],E:[],phase:'idle',ci:0,ti:0,pi:0,timer:null,speed:5,zoom:1,tree:null};
+
+const EXAMPLES = [
+`int a;
+int add(int x, int y) {
+    return x + y;
+}
+int main() {
+    int x;
+    x = add(5, 3);
+    if (a == 8)
+        return 0;
+    else
+        return 1;
+}`,
+`int judge(int a, int b) {
+    if (a == b)
+        if (a == 10)
+            return 1;
+        else
+            return 2;
+    else
+        return 0;
+}`,
+`int fact(int n) {
+    if (n == 0)
+        return 1;
+    else
+        return n * fact(n - 1);
+}
+int main() {
+    int r;
+    r = fact(5);
+    return r;
+}`
+];
+
+function loadEx(i) { document.getElementById('srcCode').value = EXAMPLES[i]; reset(); }
+
+// ========== Render ==========
+function rScan() {
+  const el = document.getElementById('scanArea'), src = S.src, pos = S.ci;
+  let h = '';
+  for (let i = 0; i < src.length; i++) {
+    const c = src[i] === '\n' ? '↵\n' : src[i];
+    const cls = i < pos ? 'bg-blue-100' : i === pos ? 'bg-yellow-200 border-b-2 border-blue-500' : '';
+    h += `<span class="${cls}">${esc(c)}</span>`;
+  }
+  el.innerHTML = h || '<span class="text-slate-400">输入代码并点击分析</span>';
+}
+
+function rTokens() {
+  const el = document.getElementById('tokenFlow');
+  let h = '';
+  for (let i = 0; i < S.ti && i < S.T.length; i++) {
+    const t = S.T[i];
+    h += `<span class="text-xs px-2 py-1 rounded fade-in ${tColor(t)}">${t.t} '${esc(t.v)}'</span>`;
+  }
+  el.innerHTML = h;
+}
+
+function rDFA() {
+  const el = document.getElementById('dfaPath');
+  if (S.ti > 0 && S.ti <= S.T.length) {
+    const t = S.T[S.ti - 1];
+    el.textContent = `状态转移: S0 ─${t.v}→ ✓ ${t.t}`;
+  } else el.textContent = '';
+}
+
+function rParse() {
+  // Reconstruct stack/input from events up to pi
+  const stackArr = [];
+  let used = 0;
+  for (let i = 0; i < S.pi && i < S.E.length; i++) {
+    const e = S.E[i];
+    if (e.a === 'sh') { stackArr.push(tDisp(e.t)); used = e.ti + 1; }
+    else if (e.a === 'rd') {
+      const arrow = e.txt.indexOf('→');
+      if (arrow > 0) {
+        const rhs = e.txt.substring(arrow + 1).trim();
+        const n = rhs === 'ε' ? 0 : rhs.split(/\s+/).length;
+        for (let j = 0; j < n && stackArr.length; j++) stackArr.pop();
+        stackArr.push(e.txt.substring(0, arrow).trim());
+      }
+    }
+  }
+
+  const stEl = document.getElementById('stackArea');
+  stEl.innerHTML = stackArr.length ? stackArr.map((s,i) => `<div class="py-0.5 border-l-2 ${i===stackArr.length-1?'border-blue-500 bg-blue-100':'border-slate-300'} pl-1">${esc(s)}</div>`).join('') : '<span class="text-slate-400">空</span>';
+
+  const inEl = document.getElementById('inputArea');
+  inEl.innerHTML = S.T.map((t,i) => `<span class="px-1 ${i<used?'opacity-20':i===used?'bg-yellow-200':''}">${esc(tDisp(t))}</span>`).join(' ');
+
+  const acEl = document.getElementById('actionBox');
+  if (S.pi > 0 && S.pi <= S.E.length) {
+    const e = S.E[S.pi - 1];
+    const cls = e.a === 'sh' ? 'bg-blue-100 text-blue-800 border-l-2 border-blue-500' :
+                e.a === 'rd' ? 'bg-green-100 text-green-800 border-l-2 border-green-500' :
+                e.a === 'ac' ? 'bg-green-100 text-green-800 border-l-2 border-green-500 font-semibold' : 'bg-red-100 text-red-800 border-l-2 border-red-500';
+    acEl.className = `mt-3 font-mono text-xs p-2 rounded-lg min-h-[28px] ${cls}`;
+    acEl.textContent = e.a === 'sh' ? `移进: ${tDisp(e.t)}` : e.txt;
+  } else { acEl.className = 'mt-3 font-mono text-xs p-2 rounded-lg min-h-[28px] bg-slate-100'; acEl.textContent = ''; }
+}
+
+function rAST() {
+  const el = document.getElementById('astArea');
+  if (S.phase !== 'done') { el.innerHTML = '<span class="text-xs text-slate-400 p-3">编译完成后显示</span>'; return; }
+
+  // Build tree from final stack (approximate)
+  // Actually, let's build from events
+  const nodes = [];
+  for (let i = S.E.length - 1; i >= 0; i--) {
+    const e = S.E[i];
+    if (e.a === 'rd') {
+      const parts = e.txt.split('→');
+      if (parts.length === 2) {
+        nodes.unshift({lhs: parts[0].trim(), rhs: parts[1].trim()});
+      }
+    }
+  }
+
+  // Render as simple tree SVG
+  const scale = S.zoom;
+  let svg = `<svg width="100%" height="${Math.max(80, nodes.length * 25 * scale)}" style="transform: scale(${scale}); transform-origin: top left;">`;
+  let x = 20, y = 20;
+  for (let i = 0; i < Math.min(nodes.length, 12); i++) {
+    const n = nodes[i];
+    const w = Math.max(60, n.lhs.length * 7);
+    svg += `<rect x="${x}" y="${y}" width="${w}" height="20" rx="4" fill="#e0e7ff" stroke="#6366f1" stroke-width="1"/>`;
+    svg += `<text x="${x+4}" y="${y+14}" font-family="monospace" font-size="11" fill="#4f46e5">${esc(n.lhs)}</text>`;
+    svg += `<text x="${x}" y="${y+32}" font-family="monospace" font-size="9" fill="#64748b">${esc(n.rhs)}</text>`;
+    x += w + 20;
+  }
+  svg += '</svg>';
+  el.innerHTML = svg;
+}
+
+function rAll() { rScan(); rTokens(); rDFA(); rParse(); rAST(); rStatus(); }
+
+function rStatus() {
+  const el = document.getElementById('statusBar');
+  if (S.phase === 'lexing') { if (S.ti > 0) { const t = S.T[S.ti-1]; el.textContent = `词法: '${esc(t.v)}' → ${t.t}`; } else el.textContent = '词法分析...'; }
+  else if (S.phase === 'parsing') { if (S.pi > 0 && S.pi <= S.E.length) { const e = S.E[S.pi-1]; el.textContent = e.a === 'sh' ? `移进: ${tDisp(e.t)}` : `归约: ${e.txt}`; } else el.textContent = '语法分析...'; }
+  else if (S.phase === 'done') el.textContent = '✓ 编译完成';
+  else el.textContent = '就绪';
+}
+
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/'/g,'&#39;'); }
+
+// ========== Controls ==========
+function compile() {
+  reset();
+  S.src = document.getElementById('srcCode').value;
+  if (!S.src.trim()) return;
+  S.T = lexer(S.src);
+  const result = parse(S.T);
+  S.E = result.events;
+  S.phase = 'lexing';
+  document.getElementById('btnStep').disabled = false;
+  document.getElementById('btnAuto').disabled = false;
+  rAll();
+}
+
+function doStep() {
+  if (S.phase === 'idle' || S.phase === 'done') return;
+  if (S.phase === 'lexing') {
+    if (S.ti < S.T.length) {
+      const t = S.T[S.ti];
+      S.ci = t.p + t.v.length;
+      S.ti++;
+      rAll();
+    }
+    if (S.ti >= S.T.length) { S.phase = 'parsing'; S.ci = S.src.length; rAll(); }
+  } else if (S.phase === 'parsing') {
+    if (S.pi < S.E.length) { S.pi++; rAll(); }
+    if (S.pi >= S.E.length) { S.phase = 'done'; rAll(); }
+  }
+}
+
+function toggleAuto() {
+  const btn = document.getElementById('btnAuto');
+  if (S.timer) { clearInterval(S.timer); S.timer = null; btn.textContent = '▶ 自动'; }
+  else {
+    btn.textContent = '■ 暂停';
+    S.timer = setInterval(() => { if (S.phase === 'done') { toggleAuto(); return; } doStep(); }, 400 / S.speed);
+  }
+}
+
+function reset() {
+  if (S.timer) { clearInterval(S.timer); S.timer = null; }
+  S = {src:'',T:[],E:[],phase:'idle',ci:0,ti:0,pi:0,timer:null,speed:parseInt(document.getElementById('speed').value)||5,zoom:1};
+  document.getElementById('btnStep').disabled = true;
+  document.getElementById('btnAuto').disabled = true;
+  document.getElementById('btnAuto').textContent = '▶ 自动';
+  document.getElementById('scanArea').innerHTML = '';
+  document.getElementById('tokenFlow').innerHTML = '';
+  document.getElementById('dfaPath').textContent = '';
+  document.getElementById('stackArea').innerHTML = '';
+  document.getElementById('inputArea').innerHTML = '';
+  document.getElementById('actionBox').className = 'mt-3 font-mono text-xs p-2 rounded-lg min-h-[28px] bg-slate-100';
+  document.getElementById('actionBox').textContent = '';
+  document.getElementById('astArea').innerHTML = '<span class="text-xs text-slate-400 p-3">编译完成后显示</span>';
+  document.getElementById('statusBar').textContent = '就绪';
+}
+
+function zoomIn() { S.zoom = Math.min(S.zoom + 0.2, 2); rAST(); }
+function zoomOut() { S.zoom = Math.max(S.zoom - 0.2, 0.5); rAST(); }
+
+document.getElementById('speed').addEventListener('input', function() {
+  S.speed = parseInt(this.value);
+  if (S.timer) { toggleAuto(); toggleAuto(); }
+});
+
+// Initialize
+reset();
+</script>
+</body>
+</html>

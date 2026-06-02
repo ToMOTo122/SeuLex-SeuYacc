@@ -1,0 +1,28 @@
+int status;
+int score;
+
+int calculate(int x, int y) {
+    return x + y;
+}
+
+int judge(int a, int b) {
+    if (a == b)
+        if (a == 10)
+            return 1;
+        else
+            return 2; 
+    else
+        return 0;
+}
+
+int main() {
+    int res;
+    score = 10;
+    status = 10;
+    res = calculate(score, status);
+    
+    if (res == 20)
+        return judge(score, status);
+    else
+        return 0;
+}

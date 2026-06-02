@@ -1,0 +1,17 @@
+int a;
+
+int add(int x, int y)
+{
+    return x + y;
+}
+
+int main()
+{
+    int x;
+    x = 10;
+    a = add(x, 5);
+    if (a == 15)
+        return 0;
+    else
+        return 1;
+}
