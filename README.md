@@ -236,10 +236,32 @@ MiniC 是一个精简的 C 子集语言，支持：
 
 ### 简介
 
-`minic-visualizer` 是一个基于 React + Vite + Tailwind CSS 的前端可视化项目，将 SeuLex 词法分析和 SeuYacc 语法分析的过程以动画形式呈现，帮助理解编译器前端的工作原理。
+`minic-visualizer` 是一个基于 React + Vite + Tailwind CSS 的前端可视化项目，用于将 SeuLex 词法分析和 SeuYacc 语法分析过程以动画形式呈现，帮助理解编译器前端的核心工作流程。
+
+本项目基于东南大学编译原理课程设计要求实现，并在开源项目基础上进行了二次开发与重构。
+
 
 <img width="2862" height="1536" alt="image" src="https://github.com/user-attachments/assets/39de13c5-221d-4629-82ba-693081f40787" />
 
+
+
+### 来源与致谢
+
+本项目参考并基于以下开源项目：
+
+https://github.com/danielace1/compiler-visualizer  
+（MIT License, Copyright (c) 2025 Sudharsan A）
+
+原项目提供了编译过程可视化的整体设计思路与部分实现参考。
+
+本项目在此基础上进行了较大幅度的重构与扩展，包括：
+
+- React + Vite 架构重建
+- 编译流程状态管理重新设计（useMiniCCompiler）
+- 词法 / 语法分析逻辑 JS 化实现
+- AST 构建逻辑重写
+- 符号表分析模块重构
+- 动画与交互体验优化
 
 
 ### 项目结构
@@ -400,6 +422,4 @@ del yylex.c yyparse.c minic.tab.h
 
 重新构建只需再次运行 `python build_demo.py`。
 
-## 许可证
 
-本项目为东南大学编译原理课程设计作品，仅供学习和教学使用。
